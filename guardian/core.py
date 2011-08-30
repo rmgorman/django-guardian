@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q, F
 
 from guardian.utils import get_identity
+from guardian.models import UserObjectPermission
 
 class ObjectPermissionChecker(object):
     """
@@ -32,21 +33,27 @@ class ObjectPermissionChecker(object):
         self.user, self.group = get_identity(user_or_group)
         self._obj_perms_cache = {}
 
-    def has_perm(self, perm, obj):
+    def has_perm(self, codename, obj):
         """
-        Checks if user/group has given permission for object.
+        Checks if user has given permission for object.
 
-        :param perm: permission as string, may or may not contain app_label
-          prefix (if not prefixed, we grab app_label from ``obj``)
+        :param perm: permission as string, does not contain app_label since
+        it is parsed in the backend.
         :param obj: Django model instance for which permission should be checked
 
         """
-        perm = perm.split('.')[-1]
         if self.user and not self.user.is_active:
             return False
         elif self.user and self.user.is_superuser:
             return True
-        return perm in self.get_perms(obj)
+        ctype = ContentType.objects.get_for_model(obj)
+        if self.user: 
+            return UserObjectPermission.objects\
+                .filter(user=self.user)\
+                .filter(permission__content_type=ctype)\
+                .filter(permission__codename=codename)\
+                .exists()
+        return False
 
     def get_perms(self, obj):
         """
@@ -92,4 +99,5 @@ class ObjectPermissionChecker(object):
         """
         ctype = ContentType.objects.get_for_model(obj)
         return (ctype.id, obj.pk)
+
 
