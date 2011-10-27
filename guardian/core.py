@@ -5,7 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q, F
 
 from guardian.utils import get_identity
-from guardian.models import UserObjectPermission
+from guardian.models import UserObjectPermission, GroupObjectPermission
 
 class ObjectPermissionChecker(object):
     """
@@ -35,7 +35,8 @@ class ObjectPermissionChecker(object):
 
     def has_perm(self, codename, obj):
         """
-        Checks if user has given permission for object.
+        Checks if user has given permission for object either directly assigned or
+        through group assignment.
 
         :param perm: permission as string, does not contain app_label since
         it is parsed in the backend.
@@ -52,6 +53,13 @@ class ObjectPermissionChecker(object):
                 .filter(user=self.user)\
                 .filter(permission__content_type=ctype)\
                 .filter(permission__codename=codename)\
+                .filter(object_pk=obj.pk)\
+                .exists() +\
+                GroupObjectPermission.objects\
+                .filter(group__user=self.user)\
+                .filter(permission__content_type=ctype)\
+                .filter(permission__codename=codename)\
+                .filter(object_pk=obj.pk)\
                 .exists()
         return False
 
@@ -99,5 +107,4 @@ class ObjectPermissionChecker(object):
         """
         ctype = ContentType.objects.get_for_model(obj)
         return (ctype.id, obj.pk)
-
 
