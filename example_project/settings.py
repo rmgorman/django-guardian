@@ -1,6 +1,5 @@
 import os
 import sys
-import django
 
 from django.conf import global_settings
 
@@ -8,6 +7,7 @@ abspath = lambda *p: os.path.abspath(os.path.join(*p))
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
+SECRET_KEY = 'CHANGE_THIS_TO_SOMETHING_UNIQUE_AND_SECURE'
 
 PROJECT_ROOT = abspath(os.path.dirname(__file__))
 GUARDIAN_MODULE_PATH = abspath(PROJECT_ROOT, '..')
@@ -30,19 +30,18 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.admin',
     'django.contrib.messages',
+    'django.contrib.staticfiles',
 
     'guardian',
     'guardian.tests',
-    #'south',
-    #'django_coverage',
     'posts',
 )
-if django.VERSION < '1.3':
+if 'GRAPPELLI' in os.environ:
     try:
         __import__('grappelli')
         INSTALLED_APPS = ('grappelli',) + INSTALLED_APPS
     except ImportError:
-        pass
+        print "django-grappelli not installed"
 
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
@@ -53,9 +52,11 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.transaction.TransactionMiddleware',
 )
 
+STATIC_ROOT = abspath(PROJECT_ROOT, '..', 'public', 'static')
+STATIC_URL = '/static/'
 MEDIA_ROOT = abspath(PROJECT_ROOT, 'media')
 MEDIA_URL = '/media/'
-ADMIN_MEDIA_PREFIX = '/admin-media/'
+ADMIN_MEDIA_PREFIX = STATIC_URL + 'grappelli/'
 
 ROOT_URLCONF = 'example_project.urls'
 
@@ -63,9 +64,8 @@ TEMPLATE_CONTEXT_PROCESSORS = global_settings.TEMPLATE_CONTEXT_PROCESSORS + (
     'django.core.context_processors.request',
 )
 TEMPLATE_LOADERS = (
-    'django.template.loaders.filesystem.load_template_source',
-    'django.template.loaders.app_directories.load_template_source',
-    'django.template.loaders.eggs.load_template_source',
+    'django.template.loaders.filesystem.Loader',
+    'django.template.loaders.app_directories.Loader',
 )
 
 TEMPLATE_DIRS = (

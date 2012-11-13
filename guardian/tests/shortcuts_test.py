@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User, Group, Permission
+
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.query import QuerySet
 from django.test import TestCase
@@ -15,8 +15,8 @@ from guardian.shortcuts import get_objects_for_group
 from guardian.exceptions import MixedContentTypeError
 from guardian.exceptions import NotUserNorGroup
 from guardian.exceptions import WrongAppError
-
 from guardian.tests.core_test import ObjectPermissionTestCase
+from guardian.models import User, Group, Permission
 
 class ShortcutsTests(ObjectPermissionTestCase):
 
@@ -481,6 +481,20 @@ class GetObjectsForUser(TestCase):
             set(objects.values_list('name', flat=True)),
             set([groups[1].name]))
 
+    def test_any_of_multiple_perms_to_check(self):
+        group_names = ['group1', 'group2', 'group3']
+        groups = [Group.objects.create(name=name) for name in group_names]
+        assign('auth.change_group', self.user, groups[0])
+        assign('auth.delete_group', self.user, groups[2])
+
+        objects = get_objects_for_user(self.user, ['auth.change_group',
+            'auth.delete_group'], any_perm=True)
+        self.assertEqual(len(objects), 2)
+        self.assertTrue(isinstance(objects, QuerySet))
+        self.assertEqual(
+            set(objects.values_list('name', flat=True)),
+            set([groups[0].name, groups[2].name]))
+
     def test_groups_perms(self):
         group1 = Group.objects.create(name='group1')
         group2 = Group.objects.create(name='group2')
@@ -529,6 +543,8 @@ class GetObjectsForGroup(TestCase):
         self.obj1 = ContentType.objects.create(name='ct1', model='foo',
             app_label='guardian-tests')
         self.obj2 = ContentType.objects.create(name='ct2', model='bar',
+            app_label='guardian-tests')
+        self.obj3 = ContentType.objects.create(name='ct3', model='baz',
             app_label='guardian-tests')
         self.user1 = User.objects.create(username='user1')
         self.user2 = User.objects.create(username='user2')
@@ -613,11 +629,25 @@ class GetObjectsForGroup(TestCase):
         assign('delete_contenttype', self.group1, self.obj1)
         assign('change_contenttype', self.group1, self.obj2)
 
-        objects = get_objects_for_group(self.group1, ['contenttypes.change_contenttype',
+        objects = get_objects_for_group(self.group1, [
+            'contenttypes.change_contenttype',
             'contenttypes.delete_contenttype'])
         self.assertEqual(len(objects), 1)
         self.assertTrue(isinstance(objects, QuerySet))
         self.assertEqual(objects[0], self.obj1)
+
+    def test_any_of_multiple_perms_to_check(self):
+        assign('change_contenttype', self.group1, self.obj1)
+        assign('delete_contenttype', self.group1, self.obj1)
+        assign('add_contenttype', self.group1, self.obj2)
+        assign('delete_contenttype', self.group1, self.obj3)
+
+        objects = get_objects_for_group(self.group1,
+            ['contenttypes.change_contenttype',
+            'contenttypes.delete_contenttype'], any_perm=True)
+        self.assertTrue(isinstance(objects, QuerySet))
+        self.assertEqual([obj for obj in objects.order_by('name')],
+            [self.obj1, self.obj3])
 
     def test_results_for_different_groups_are_correct(self):
         assign('change_contenttype', self.group1, self.obj1)

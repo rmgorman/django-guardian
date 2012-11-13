@@ -1,17 +1,19 @@
 """
 Convenient shortcuts to manage or check object permissions.
 """
-from django.contrib.auth.models import Permission, User, Group
+
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Q
 from django.shortcuts import _get_queryset
+from itertools import groupby
+
 from guardian.core import ObjectPermissionChecker
 from guardian.exceptions import MixedContentTypeError
 from guardian.exceptions import WrongAppError
 from guardian.models import UserObjectPermission, GroupObjectPermission
 from guardian.utils import get_identity
-from itertools import groupby
+from guardian.models import Permission, User, Group
 
 def assign(perm, user_or_group, obj=None):
     """
@@ -31,7 +33,7 @@ def assign(perm, user_or_group, obj=None):
     We can assign permission for ``Model`` instance for specific user:
 
     >>> from django.contrib.sites.models import Site
-    >>> from django.contrib.auth.models import User, Group
+    >>> from guardian.models import User, Group
     >>> from guardian.shortcuts import assign
     >>> site = Site.objects.get_current()
     >>> user = User.objects.create(username='joe')
@@ -161,8 +163,8 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
 
     Example::
 
-        >>> from django.contrib.auth.models import User
         >>> from django.contrib.flatpages.models import FlatPage
+        >>> from guardian.models import User
         >>> from guardian.shortcuts import assign, get_users_with_perms
         >>>
         >>> page = FlatPage.objects.create(title='Some page', path='/some/page/')
@@ -212,9 +214,9 @@ def get_groups_with_perms(obj, attach_perms=False):
 
     Example::
 
-        >>> from django.contrib.auth.models import Group
         >>> from django.contrib.flatpages.models import FlatPage
         >>> from guardian.shortcuts import assign, get_groups_with_perms
+        >>> from guardian.models import Group
         >>>
         >>> page = FlatPage.objects.create(title='Some page', path='/some/page/')
         >>> admins = Group.objects.create(name='Admins')
@@ -246,7 +248,7 @@ def get_groups_with_perms(obj, attach_perms=False):
                 groups[group] = get_perms(group, obj)
         return groups
 
-def get_objects_for_user(user, perms, klass=None, use_groups=True):
+def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=False):
     """
     Returns queryset of objects for which a given ``user`` has *all*
     permissions present at ``perms``.
@@ -262,6 +264,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True):
       this parameter would be computed based on given ``params``.
     :param use_groups: if ``False``, wouldn't check user's groups object
       permissions. Default is ``True``.
+    :param any_perm: if True, any of permission in sequence is accepted
 
     :raises MixedContentTypeError: when computed content type for ``perms``
       and/or ``klass`` clashes.
@@ -282,8 +285,10 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True):
         
     The permission string can also be an iterable. Continuing with the previous example:
       
-        >>> get_objects_for_user(joe, ['auth.change_group', 'auth.delete_group'], 'auth.delete_group'])
+        >>> get_objects_for_user(joe, ['auth.change_group', 'auth.delete_group'])
         []
+        >>> get_objects_for_user(joe, ['auth.change_group', 'auth.delete_group'], any_perm=True)
+        [<Group some group>]
         >>> assign('auth.delete_group', joe, group)
         >>> get_objects_for_user(joe, ['auth.change_group', 'auth.delete_group'])
         [<Group some group>]        
@@ -357,13 +362,13 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True):
     pk_list = []
     for pk, group in groupby(data, keyfunc):
         obj_codenames = set((e[1] for e in group))
-        if codenames.issubset(obj_codenames):
+        if any_perm or codenames.issubset(obj_codenames):
             pk_list.append(pk)
 
     objects = queryset.filter(pk__in=pk_list)
     return objects
 
-def get_objects_for_group(group, perms, klass=None):
+def get_objects_for_group(group, perms, klass=None, any_perm=False):
     """
     Returns queryset of objects for which a given ``group`` has *all*
     permissions present at ``perms``.
@@ -377,6 +382,7 @@ def get_objects_for_group(group, perms, klass=None):
       the same or ``MixedContentTypeError`` exception would be raised.
     :param klass: may be a Model, Manager or QuerySet object. If not given
       this parameter would be computed based on given ``params``.
+    :param any_perm: if True, any of permission in sequence is accepted
 
     :raises MixedContentTypeError: when computed content type for ``perms``
       and/or ``klass`` clashes.
@@ -466,7 +472,7 @@ def get_objects_for_group(group, perms, klass=None):
     pk_list = []
     for pk, group in groupby(data, keyfunc):
         obj_codenames = set((e[1] for e in group))
-        if codenames.issubset(obj_codenames):
+        if any_perm or codenames.issubset(obj_codenames):
             pk_list.append(pk)
 
     objects = queryset.filter(pk__in=pk_list)

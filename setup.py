@@ -18,7 +18,7 @@ setup(
     author = 'Lukasz Balcerzak',
     author_email = 'lukaszbalcerzak@gmail.com',
     download_url='http://github.com/lukaszb/django-guardian/downloads',
-    description = guardian.__doc__,
+    description = guardian.__doc__.strip(),
     long_description = long_description,
     zip_safe = False,
     packages = find_packages(),
@@ -28,6 +28,9 @@ setup(
     license = 'BSD',
     install_requires = [
         'Django>=1.2',
+    ],
+    tests_require = [
+        'mock',
     ],
     classifiers = ['Development Status :: 5 - Production/Stable',
                    'Environment :: Web Environment',

@@ -1,16 +1,12 @@
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.core.exceptions import PermissionDenied
-from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.utils.functional import wraps
-from django.utils.http import urlquote
 from django.db.models import Model, get_model
 from django.db.models.base import ModelBase
 from django.db.models.query import QuerySet
-from django.shortcuts import get_object_or_404, render_to_response
-from django.template import RequestContext, TemplateDoesNotExist
-from guardian.conf import settings as guardian_settings
+from django.shortcuts import get_object_or_404
 from guardian.exceptions import GuardianError
+from guardian.utils import get_403_or_None
 
 
 def permission_required(perm, lookup_variables=None, **kwargs):
@@ -30,6 +26,12 @@ def permission_required(perm, lookup_variables=None, **kwargs):
       login page, response with status code 403 is returned (
       ``django.http.HttpResponseForbidden`` instance or rendered template -
       see :setting:`GUARDIAN_RENDER_403`). Defaults to ``False``.
+    :param accept_global_perms: if set to ``True``, then *object level
+      permission* would be required **only if user does NOT have global
+      permission** for target *model*. If turned on, makes this decorator
+      like an extension over standard
+      ``django.contrib.admin.decorators.permission_required`` as it would
+      check for global permissions first. Defaults to ``False``.
 
     Examples::
 
@@ -53,6 +55,7 @@ def permission_required(perm, lookup_variables=None, **kwargs):
     login_url = kwargs.pop('login_url', settings.LOGIN_URL)
     redirect_field_name = kwargs.pop('redirect_field_name', REDIRECT_FIELD_NAME)
     return_403 = kwargs.pop('return_403', False)
+    accept_global_perms = kwargs.pop('accept_global_perms', False)
 
     # Check if perm is given as string in order not to decorate
     # view function itself which makes debugging harder
@@ -74,7 +77,7 @@ def permission_required(perm, lookup_variables=None, **kwargs):
                         raise GuardianError("If model should be looked up from "
                             "string it needs format: 'app_label.ModelClass'")
                     model = get_model(*splitted)
-                elif type(model) in (Model, ModelBase, QuerySet):
+                elif issubclass(model.__class__, (Model, ModelBase, QuerySet)):
                     pass
                 else:
                     raise GuardianError("First lookup argument must always be "
@@ -92,31 +95,15 @@ def permission_required(perm, lookup_variables=None, **kwargs):
                     lookup_dict[lookup] = kwargs[view_arg]
                 obj = get_object_or_404(model, **lookup_dict)
 
-
-            # Handles both original and with object provided permission check
-            # as ``obj`` defaults to None
-            if not request.user.has_perm(perm, obj):
-                if return_403:
-                    if guardian_settings.RENDER_403:
-                        try:
-                            response = render_to_response(
-                                guardian_settings.TEMPLATE_403, {},
-                                RequestContext(request))
-                            response.status_code = 403
-                            return response
-                        except TemplateDoesNotExist, e:
-                            if settings.DEBUG:
-                                raise e
-                    elif guardian_settings.RAISE_403:
-                        raise PermissionDenied
-                    return HttpResponseForbidden()
-                else:
-                    path = urlquote(request.get_full_path())
-                    tup = login_url, redirect_field_name, path
-                    return HttpResponseRedirect("%s?%s=%s" % tup)
+            response = get_403_or_None(request, perms=[perm], obj=obj,
+                login_url=login_url, redirect_field_name=redirect_field_name,
+                return_403=return_403, accept_global_perms=accept_global_perms)
+            if response:
+                return response
             return view_func(request, *args, **kwargs)
         return wraps(view_func)(_wrapped_view)
     return decorator
+
 
 def permission_required_or_403(perm, *args, **kwargs):
     """

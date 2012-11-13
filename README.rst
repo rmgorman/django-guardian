@@ -2,9 +2,20 @@
 django-guardian
 ===============
 
+.. image:: https://secure.travis-ci.org/lukaszb/django-guardian.png?branch=master
+  :target: http://travis-ci.org/lukaszb/django-guardian
+
+
 ``django-guardian`` is implementation of per object permissions [1]_ as 
 authorization backend which is supported since Django_ 1.2. It won't
 work with older Django_ releases.
+
+Documentation
+-------------
+
+Online documentation is available at
+
+http://packages.python.org/django-guardian/ or http://django-guardian.rtfd.org/
 
 Installation
 ------------
@@ -75,12 +86,6 @@ For example::
         pass
 
     admin.site.register(Author, AuthorAdmin)
-
-Documentation
--------------
-
-There is an online documentation available at
-http://packages.python.org/django-guardian/.
 
 
 .. [1] Great paper about this feature is available at 

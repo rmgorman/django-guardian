@@ -1,9 +1,9 @@
-from django.contrib.auth.models import User
 from django.db import models
 
 from guardian.conf import settings
 from guardian.exceptions import WrongAppError
 from guardian.core import ObjectPermissionChecker
+from guardian.models import User
 
 class ObjectPermissionBackend(object):
     supports_object_permissions = True
@@ -46,7 +46,7 @@ class ObjectPermissionBackend(object):
             user_obj = User.objects.get(pk=settings.ANONYMOUS_USER_ID)
 
         # Do not check any further if user is not active
-        if user_obj.is_active is not True:
+        if not user_obj.is_active:
             return False
 
         if len(perm.split('.')) > 1:

@@ -4,7 +4,6 @@ from django.conf.urls.defaults import patterns, url
 from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
-from django.contrib.auth.models import User, Group
 from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response, get_object_or_404, redirect
 from django.template import RequestContext
@@ -17,7 +16,7 @@ from guardian.shortcuts import get_perms
 from guardian.shortcuts import get_users_with_perms
 from guardian.shortcuts import get_groups_with_perms
 from guardian.shortcuts import get_perms_for_model
-
+from guardian.models import User, Group
 
 class AdminUserObjectPermissionsForm(UserObjectPermissionsForm):
     """
@@ -151,6 +150,7 @@ class GuardedModelAdmin(admin.ModelAdmin):
         related content.
         """
         context = {
+            'adminform': {'model_admin': self},
             'object': obj,
             'app_label': self.model._meta.app_label,
             'opts': self.model._meta,
